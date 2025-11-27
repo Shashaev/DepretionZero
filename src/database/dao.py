@@ -9,23 +9,23 @@ import database.connection as connection
 _session = object()
 
 
-class BaseDAO:
+class BaseDAO[T: models.Base]:
     def __init__(
         self: typing.Self,
-        model: type[models.Base],
+        model: type[T],
     ) -> None:
         self.model = model
 
     @connection.db_connection
     def create(
         self: typing.Self,
-        *args: typing.Any,
+        obj: T,
         _session: orm.Session = _session,
-        **kwargs,
-    ) -> None:
-        new_model = self.model(*args, **kwargs)
-        _session.add(new_model)
+    ) -> T:
+        _session.add(obj)
         _session.commit()
+        _session.refresh(obj)
+        return obj
 
     @connection.db_connection
     def select(
@@ -130,6 +130,25 @@ class UserDAO(BaseDAO):
 
 class ResultDAO(BaseDAO):
     model = models.ResultModel
+
+    def __init__(self):
+        super().__init__(self.model)
+
+    @connection.db_connection
+    def get_answers(
+        self: typing.Self,
+        result: models.ResultModel,
+        _session: orm.Session = _session,
+    ) -> list[models.AnswerModel]:
+        return (
+            _session.query(models.AnswerModel)
+            .filter(models.AnswerModel.result_id == result.id_model)
+            .all()
+        )
+
+
+class AnswerDAO(BaseDAO):
+    model = models.AnswerModel
 
     def __init__(self):
         super().__init__(self.model)
